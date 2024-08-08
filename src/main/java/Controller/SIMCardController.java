@@ -37,7 +37,7 @@ public class SIMCardController {
         }
     }
 
-    public class SIMCardRequest {
+    public static class SIMCardRequest {
         private String iccid;
         private String customerEmail;
 
