@@ -1,5 +1,7 @@
 package Controller;
 
+import Entity.SimCardTransaction;
+import Entity.SimCardTransactionRepo;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,27 +15,25 @@ import org.springframework.web.client.RestTemplate;
 public class SIMCardController {
 
     private final RestTemplate restTemplate;
+    private final SimCardTransactionRepo repo;
 
-    public SIMCardController(RestTemplate restTemplate) {
+    public SIMCardController(RestTemplate restTemplate, SimCardTransactionRepo repo) {
         this.restTemplate = restTemplate;
+        this.repo = repo;
     }
 
     @PostMapping("/activate")
     public ResponseEntity<String> activateSIMCard(@RequestBody SIMCardRequest request) {
         String actuatorUrl = "http://localhost:8444/actuate";
-        ResponseEntity<ActuatorResponse> response = restTemplate.postForEntity(actuatorUrl, request, ActuatorResponse.class);
+        ResponseEntity<ActuatorResponse> response = restTemplate.postForEntity(actuatorUrl, new ActuatorRequest(request.getICCID()), ActuatorResponse.class);
 
-        if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-            boolean success = response.getBody().isSuccess();
+        boolean success = response.getStatusCode() == HttpStatus.OK && response.getBody() != null && response.getBody().isSuccess();
+        repo.save(new SimCardTransaction(request.getICCID(), request.getCustomerEmail(), success));
 
-            if (success) {
-                return ResponseEntity.ok("SIM card activation successful.");
-            } else {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("SIM card activation failed.");
-            }
-
+        if (success) {
+            return ResponseEntity.ok("SIM card activation successful.");
         } else {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error occurred while contacting actuator.");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("SIM card activation failed.");
         }
     }
 
@@ -72,6 +72,23 @@ public class SIMCardController {
 
         public boolean isSuccess() {
             return success;
+        }
+    }
+
+    public static class ActuatorRequest {
+        private String iccid;
+
+        public ActuatorRequest(String iccid) {
+            this.iccid = iccid;
+        }
+
+        // Getter and setter
+        public String getIccid() {
+            return iccid;
+        }
+
+        public void setIccid(String iccid) {
+            this.iccid = iccid;
         }
     }
 }
